@@ -158,6 +158,7 @@ function loadTopics() {
 }
 function saveTopics(t) {
   try { localStorage.setItem(TOPICS_KEY, JSON.stringify(t)); } catch(e) {}
+  if (_remoteCache !== null) _remoteCache._topics = t;
   saveTopicsRemote(t);
 }
 
@@ -532,7 +533,11 @@ async function runSearch() {
 
 // ── Sync panel ───────────────────────────────────────────────────────────────
 
-function openSyncPanel() {
+async function openSyncPanel() {
+  if (_remoteCache !== null) {
+    _remoteCache._topics = topics;
+    await saveRemoteCache();
+  }
   const binId = getBinId() || 'not-yet-created';
   document.getElementById('syncCodeDisplay').value = getUserId() + '|' + binId;
   document.getElementById('syncCodeInput').value = '';
