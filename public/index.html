@@ -543,15 +543,16 @@ async function runSearch() {
 // ── Sync panel ───────────────────────────────────────────────────────────────
 
 async function openSyncPanel() {
-  if (_remoteCache !== null) {
-    _remoteCache._topics = topics;
-    await saveRemoteCache();
-  }
-  const binId = getBinId() || 'not-yet-created';
-  document.getElementById('syncCodeDisplay').value = getUserId() + '|' + binId;
+  document.getElementById('syncCodeDisplay').value = 'Saving...';
   document.getElementById('syncCodeInput').value = '';
   document.getElementById('syncMsg').textContent = '';
   document.getElementById('syncOverlay').style.display = 'flex';
+  try {
+    _remoteCache._topics = topics;
+    await saveRemoteCache();
+  } catch(e) {}
+  const binId = getBinId() || 'not-yet-created';
+  document.getElementById('syncCodeDisplay').value = getUserId() + '|' + binId;
 }
 function closeSyncPanel() { document.getElementById('syncOverlay').style.display = 'none'; }
 function copySyncCode() {
@@ -567,7 +568,6 @@ async function applySyncCode() {
   const parts = raw.split('|');
   if (parts.length !== 2 || !parts[0] || !parts[1]) { msg.style.color = '#a02020'; msg.textContent = 'Invalid sync code.'; return; }
   const [uid, binId] = parts;
-  if (binId === 'not-yet-created') { msg.style.color = '#a02020'; msg.textContent = 'That device has no saved results yet. Run a fetch first, then copy the code.'; return; }
   msg.style.color = '#8E8E9A'; msg.textContent = 'Verifying...';
   try {
     const res = await fetch(`/api/cache?binId=${binId}`);
