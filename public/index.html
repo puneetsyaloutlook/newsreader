@@ -159,7 +159,7 @@ function loadTopics() {
 function saveTopics(t) {
   try { localStorage.setItem(TOPICS_KEY, JSON.stringify(t)); } catch(e) {}
   if (_remoteCache !== null) _remoteCache._topics = t;
-  saveTopicsRemote(t);
+  ensureBinExists().then(() => saveTopicsRemote(t));
 }
 
 function getUserId() {
@@ -173,18 +173,20 @@ function getUserId() {
 function getBinId() { return localStorage.getItem(BIN_ID_KEY) || null; }
 function setBinId(id) { localStorage.setItem(BIN_ID_KEY, id); }
 
-let _remoteCache = null;
+let _remoteCache = {};
+let _remoteCacheLoaded = false;
 
 async function loadRemoteCache() {
-  if (_remoteCache) return _remoteCache;
+  if (_remoteCacheLoaded) return _remoteCache;
   const binId = getBinId();
-  if (!binId) { _remoteCache = {}; return _remoteCache; }
+  if (!binId) { _remoteCacheLoaded = true; return _remoteCache; }
   try {
     const res = await fetch(`/api/cache?binId=${binId}`);
-    if (!res.ok) { _remoteCache = {}; return _remoteCache; }
+    if (!res.ok) { _remoteCacheLoaded = true; return _remoteCache; }
     _remoteCache = await res.json() || {};
+    _remoteCacheLoaded = true;
     return _remoteCache;
-  } catch(e) { _remoteCache = {}; return _remoteCache; }
+  } catch(e) { _remoteCacheLoaded = true; return _remoteCache; }
 }
 
 async function saveRemoteCache() {
@@ -207,6 +209,13 @@ async function saveRemoteCache() {
       if (result.metadata?.id) setBinId(result.metadata.id);
     }
   } catch(e) {}
+}
+
+async function ensureBinExists() {
+  if (getBinId()) return;
+  if (!_remoteCache) _remoteCache = {};
+  _remoteCache._topics = topics;
+  await saveRemoteCache();
 }
 
 async function loadResults(id) {
@@ -565,7 +574,8 @@ async function applySyncCode() {
     if (!res.ok) { msg.style.color = '#a02020'; msg.textContent = 'Could not verify that sync code.'; return; }
     localStorage.setItem(USER_ID_KEY, uid);
     localStorage.setItem(BIN_ID_KEY, binId);
-    _remoteCache = null;
+    _remoteCache = {};
+    _remoteCacheLoaded = false;
     await loadRemoteCache();
     const remoteTopics = await loadTopicsRemote();
     if (remoteTopics && remoteTopics.length) {
