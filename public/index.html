@@ -195,7 +195,10 @@ async function loadRemoteCache() {
   const binId = getBinId();
   if (!binId) { _remoteCacheLoaded = true; return _remoteCache; }
   try {
-    const res = await fetch(`/api/cache?binId=${binId}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(`/api/cache?binId=${binId}`, { signal: controller.signal });
+    clearTimeout(timeout);
     if (!res.ok) { _remoteCacheLoaded = true; return _remoteCache; }
     _remoteCache = await res.json() || {};
     _remoteCacheLoaded = true;
@@ -335,18 +338,10 @@ async function renderMain() {
   const topic = topics.find(t => t.id === activeId);
   if (!topic) { area.innerHTML = `<div class="no-topic">No topic selected.</div>`; return; }
 
-  area.innerHTML = `<div class="topic-header"><div class="topic-name">${esc(topic.name)}</div><div class="topic-meta">Loading...</div></div>`;
-
-  let cached = null;
-  try { cached = await loadResults(topic.id); } catch(e) {}
-
-  const cachedHtml = cached ? renderCards(cached.items) : '';
-  const cachedBanner = cached
-    ? `<div class="cache-banner" id="cacheBanner">Fetched ${esc(cached.timestamp || cached.time)}</div>`
-    : `<div class="cache-banner cache-empty" id="cacheBanner">No results yet — hit fetch to run.</div>`;
-
   const days = topic.days || 5;
   const daysLabel = days === 1 ? '1 day' : `${days} days`;
+  const existingGroups = [...new Set(topics.map(t => t.group||'Other'))];
+  const groupOptions = existingGroups.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
 
   area.innerHTML = `
     <div class="topic-header">
@@ -370,9 +365,19 @@ async function renderMain() {
       <button class="btn" onclick="togglePanel()">Edit topic</button>
       <div class="spinner" id="spinner"></div>
       <span id="statusText"></span>
-      ${cachedBanner}
+      <div class="cache-banner cache-empty" id="cacheBanner">Loading...</div>
     </div>
-    <div class="results" id="results">${cachedHtml}</div>`;
+    <div class="results" id="results"></div>`;
+
+  let cached = null;
+  try { cached = await loadResults(topic.id); } catch(e) {}
+  const banner = document.getElementById('cacheBanner');
+  const resultsEl = document.getElementById('results');
+  if (banner) {
+    if (cached) { banner.textContent = 'Fetched ' + esc(cached.timestamp || cached.time); banner.classList.remove('cache-empty'); }
+    else { banner.textContent = 'No results yet — hit fetch to run.'; }
+  }
+  if (resultsEl) resultsEl.innerHTML = cached ? renderCards(cached.items) : '';
 }
 
 function renderCards(items) {
