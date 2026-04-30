@@ -2,6 +2,8 @@ const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 const DATA_KEY = 'signalcatcher:data';
 
+const headers = { Authorization: `Bearer ${UPSTASH_TOKEN}` };
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
@@ -16,10 +18,8 @@ export default async function handler(req, res) {
   // GET /api/cache — read all data
   if (req.method === 'GET') {
     try {
-      const res2 = await fetch(`${UPSTASH_URL}/get/${DATA_KEY}`, {
-        headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` }
-      });
-      const json = await res2.json();
+      const r = await fetch(`${UPSTASH_URL}/get/${DATA_KEY}`, { headers });
+      const json = await r.json();
       if (!json.result) return res.status(200).json({});
       const data = typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
       return res.status(200).json(data);
@@ -31,15 +31,13 @@ export default async function handler(req, res) {
   // PUT /api/cache — write all data
   if (req.method === 'PUT') {
     try {
-      const body = req.body;
-      await fetch(`${UPSTASH_URL}/set/${DATA_KEY}`, {
+      const value = JSON.stringify(req.body);
+      const r = await fetch(`${UPSTASH_URL}/set/${DATA_KEY}`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${UPSTASH_TOKEN}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ value: JSON.stringify(body) })
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify([DATA_KEY, value])
       });
+      const json = await r.json();
       return res.status(200).json({ ok: true });
     } catch(e) {
       return res.status(500).json({ error: e.message });
