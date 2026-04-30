@@ -181,6 +181,16 @@ const DEFAULT_TOPICS = [
 
 // ── Storage ──────────────────────────────────────────────────────────────────
 
+const RESULTS_CACHE_KEY = 'signal-filter-results';
+
+function loadLocalResults() {
+  try { const s = localStorage.getItem(RESULTS_CACHE_KEY); return s ? JSON.parse(s) : {}; }
+  catch(e) { return {}; }
+}
+function saveLocalResults(data) {
+  try { localStorage.setItem(RESULTS_CACHE_KEY, JSON.stringify(data)); } catch(e) {}
+}
+
 function loadTopics() {
   try { const s = localStorage.getItem(TOPICS_KEY); return s ? JSON.parse(s) : DEFAULT_TOPICS; }
   catch(e) { return DEFAULT_TOPICS; }
@@ -251,13 +261,22 @@ async function ensureBinExists() {
 }
 
 async function loadResults(id) {
+  const local = loadLocalResults();
+  if (local[id]) return local[id];
   try {
     const cache = await loadRemoteCache();
+    if (cache[id]) {
+      local[id] = cache[id];
+      saveLocalResults(local);
+    }
     return cache[id] || null;
   } catch(e) { return null; }
 }
 
 async function saveResults(id, data) {
+  const local = loadLocalResults();
+  local[id] = data;
+  saveLocalResults(local);
   try {
     const cache = await loadRemoteCache();
     cache[id] = data;
@@ -668,8 +687,14 @@ async function init() {
     setBinId(urlBin);
     history.replaceState(null, '', window.location.pathname);
   }
-  if (!getBinId()) {
-    try {
+
+  // Render immediately from localStorage so the page is usable instantly
+  renderNav();
+  renderMain();
+
+  // Sync from remote in the background
+  try {
+    if (!getBinId()) {
       const res = await fetch('/api/cache?registry=1');
       if (res.ok) {
         const data = await res.json();
@@ -678,22 +703,31 @@ async function init() {
           _remoteCacheLoaded = false;
         }
       }
-    } catch(e) {}
-  }
-  try { await loadRemoteCache(); } catch(e) {}
-  try {
+    }
+    await loadRemoteCache();
     const remoteTopics = await loadTopicsRemote();
     if (remoteTopics && remoteTopics.length) {
       topics = remoteTopics;
       localStorage.setItem(TOPICS_KEY, JSON.stringify(topics));
-      activeId = topics[0].id;
+      activeId = activeId || topics[0].id;
+      // Sync remote results into localStorage
+      const local = loadLocalResults();
+      let updated = false;
+      for (const t of topics) {
+        if (_remoteCache[t.id] && !local[t.id]) {
+          local[t.id] = _remoteCache[t.id];
+          updated = true;
+        }
+      }
+      if (updated) saveLocalResults(local);
+      renderNav();
+      renderMain();
     }
   } catch(e) {}
-  renderNav();
-  renderMain();
 }
 
 init();
+
 </script>
 </body>
 </html>
