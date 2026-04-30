@@ -122,9 +122,17 @@ body { font-family: var(--sans); font-size: 1rem; line-height: 1.6; color: var(-
 <div id="syncOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:100; align-items:center; justify-content:center;">
   <div style="background:#fff; border-radius:10px; padding:1.5rem; max-width:420px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.18);">
     <div style="font-family:var(--serif); font-size:1.1rem; font-weight:700; margin-bottom:0.5rem;">Sync devices</div>
-    <p style="font-size:0.82rem; color:var(--muted); margin-bottom:1.25rem; line-height:1.55;">To see your results on another device, copy your sync code and paste it into that device. On a new device, paste a code from an existing device to link them.</p>
+    <p style="font-size:0.82rem; color:var(--muted); margin-bottom:1.25rem; line-height:1.55;">Copy the shareable link and open it on any other device to link automatically. Or use the sync code to link manually.</p>
     <div style="margin-bottom:1rem;">
-      <label style="font-size:0.75rem; font-weight:600; color:var(--muted); display:block; margin-bottom:4px;">Your sync code</label>
+      <label style="font-size:0.75rem; font-weight:600; color:var(--muted); display:block; margin-bottom:4px;">Shareable link</label>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="syncLinkDisplay" readonly style="flex:1; font-family:monospace; font-size:0.75rem; padding:7px 10px; border:1px solid var(--border); border-radius:var(--r); background:var(--n100); color:var(--text);" />
+        <button class="btn" onclick="copySyncLink()">Copy</button>
+      </div>
+      <div style="font-size:0.72rem; color:var(--muted); margin-top:4px;">Opening this URL on another device links it automatically.</div>
+    </div>
+    <div style="margin-bottom:1rem;">
+      <label style="font-size:0.75rem; font-weight:600; color:var(--muted); display:block; margin-bottom:4px;">Sync code</label>
       <div style="display:flex; gap:8px;">
         <input type="text" id="syncCodeDisplay" readonly style="flex:1; font-family:monospace; font-size:0.8rem; padding:7px 10px; border:1px solid var(--border); border-radius:var(--r); background:var(--n100); color:var(--text);" />
         <button class="btn" onclick="copySyncCode()">Copy</button>
@@ -588,6 +596,7 @@ async function runSearch() {
 
 async function openSyncPanel() {
   document.getElementById('syncCodeDisplay').value = 'Saving...';
+  document.getElementById('syncLinkDisplay').value = 'Saving...';
   document.getElementById('syncCodeInput').value = '';
   document.getElementById('syncMsg').textContent = '';
   document.getElementById('syncOverlay').style.display = 'flex';
@@ -597,12 +606,19 @@ async function openSyncPanel() {
   } catch(e) {}
   const binId = getBinId() || 'not-yet-created';
   document.getElementById('syncCodeDisplay').value = getUserId() + '|' + binId;
+  document.getElementById('syncLinkDisplay').value = window.location.origin + window.location.pathname + '?bin=' + binId;
 }
 function closeSyncPanel() { document.getElementById('syncOverlay').style.display = 'none'; }
 function copySyncCode() {
   navigator.clipboard.writeText(document.getElementById('syncCodeDisplay').value).then(() => {
     const msg = document.getElementById('syncMsg');
     msg.style.color = '#1D6068'; msg.textContent = 'Copied to clipboard.';
+  });
+}
+function copySyncLink() {
+  navigator.clipboard.writeText(document.getElementById('syncLinkDisplay').value).then(() => {
+    const msg = document.getElementById('syncMsg');
+    msg.style.color = '#1D6068'; msg.textContent = 'Link copied to clipboard.';
   });
 }
 async function applySyncCode() {
@@ -636,6 +652,12 @@ async function applySyncCode() {
 
 async function init() {
   getUserId();
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlBin = urlParams.get('bin');
+  if (urlBin) {
+    setBinId(urlBin);
+    history.replaceState(null, '', window.location.pathname);
+  }
   try { await loadRemoteCache(); } catch(e) {}
   try {
     const remoteTopics = await loadTopicsRemote();
