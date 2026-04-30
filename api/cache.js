@@ -1,69 +1,49 @@
-const JBIN_BASE = 'https://api.jsonbin.io/v3/b';
-const KEY = process.env.JSONBIN_API_KEY;
-const REGISTRY_BIN_ID = process.env.REGISTRY_BIN_ID;
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const DATA_KEY = 'signalcatcher:data';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  if (!KEY) return res.status(500).json({ error: 'JSONBIN_API_KEY not configured' });
-
-  const { binId, registry } = req.query;
-
-  // GET /api/cache?registry=1 — return the user's data bin ID from environment
-  if (req.method === 'GET' && registry) {
-    if (!REGISTRY_BIN_ID) return res.status(404).json({ error: 'REGISTRY_BIN_ID not configured' });
-    const upstream = await fetch(`${JBIN_BASE}/${REGISTRY_BIN_ID}/latest?meta=false`, {
-      headers: { 'X-Master-Key': KEY }
-    });
-    const data = await upstream.json();
-    return res.status(upstream.status).json(data);
+  if (!UPSTASH_URL || !UPSTASH_TOKEN) {
+    return res.status(500).json({ error: 'Upstash credentials not configured' });
   }
 
-  // GET /api/cache?binId=xxx — read bin
-  if (req.method === 'GET' && binId) {
-    const upstream = await fetch(`${JBIN_BASE}/${binId}/latest?meta=false`, {
-      headers: { 'X-Master-Key': KEY }
-    });
-    const data = await upstream.json();
-    return res.status(upstream.status).json(data);
+  // GET /api/cache — read all data
+  if (req.method === 'GET') {
+    try {
+      const res2 = await fetch(`${UPSTASH_URL}/get/${DATA_KEY}`, {
+        headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` }
+      });
+      const json = await res2.json();
+      if (!json.result) return res.status(200).json({});
+      const data = typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
+      return res.status(200).json(data);
+    } catch(e) {
+      return res.status(500).json({ error: e.message });
+    }
   }
 
-  // POST /api/cache — create new bin, body: { uid, data }
-  if (req.method === 'POST' && !binId) {
-    const { uid, data } = req.body;
-    const upstream = await fetch(JBIN_BASE, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': KEY,
-        'X-Bin-Name': uid,
-        'X-Bin-Private': 'true',
-        'X-Bin-Versioning': 'false'
-      },
-      body: JSON.stringify(data)
-    });
-    const result = await upstream.json();
-    return res.status(upstream.status).json(result);
-  }
-
-  // PUT /api/cache?binId=xxx — update bin, body: { data }
-  if (req.method === 'PUT' && binId) {
-    const { data } = req.body;
-    const upstream = await fetch(`${JBIN_BASE}/${binId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': KEY,
-        'X-Bin-Versioning': 'false'
-      },
-      body: JSON.stringify(data)
-    });
-    const result = await upstream.json();
-    return res.status(upstream.status).json(result);
+  // PUT /api/cache — write all data
+  if (req.method === 'PUT') {
+    try {
+      const body = req.body;
+      await fetch(`${UPSTASH_URL}/set/${DATA_KEY}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${UPSTASH_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ value: JSON.stringify(body) })
+      });
+      return res.status(200).json({ ok: true });
+    } catch(e) {
+      return res.status(500).json({ error: e.message });
+    }
   }
 
   return res.status(400).json({ error: 'Invalid request' });
