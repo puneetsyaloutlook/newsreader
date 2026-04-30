@@ -47,6 +47,8 @@ body { font-family: var(--sans); font-size: 1rem; line-height: 1.6; color: var(-
 
 .main { flex: 1; min-width: 0; padding: 2.5rem 2rem; max-width: 820px; }
 
+.nav-toggle-inline { display: none; background: none; border: 1px solid var(--border); border-radius: var(--r); font-size: 1rem; color: var(--muted); cursor: pointer; padding: 2px 7px; line-height: 1; flex-shrink: 0; }
+
 @media (max-width: 680px) {
   .nav-toggle { display: none; }
   .nav-toggle-inline { display: block; }
@@ -60,7 +62,6 @@ body { font-family: var(--sans); font-size: 1rem; line-height: 1.6; color: var(-
 .topic-heading-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
 .topic-name { font-family: var(--serif); font-size: 1.35rem; font-weight: 700; color: var(--text); line-height: 1.25; }
 .topic-meta { font-size: 0.75rem; color: var(--muted); }
-.nav-toggle-inline { display: none; background: none; border: 1px solid var(--border); border-radius: var(--r); font-size: 1rem; color: var(--muted); cursor: pointer; padding: 2px 7px; line-height: 1; flex-shrink: 0; }
 
 .controls { display: flex; align-items: center; gap: 8px; margin-bottom: 1.25rem; flex-wrap: wrap; }
 .controls .cache-banner { margin-left: auto; margin-bottom: 0; }
