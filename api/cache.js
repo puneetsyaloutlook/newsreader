@@ -2,7 +2,10 @@ const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 const DATA_KEY = 'signalcatcher:data';
 
-const authHeaders = { Authorization: `Bearer ${UPSTASH_TOKEN}` };
+const authHeaders = {
+  Authorization: `Bearer ${UPSTASH_TOKEN}`,
+  'Content-Type': 'application/json'
+};
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -28,13 +31,14 @@ export default async function handler(req, res) {
     }
   }
 
-  // PUT — write data using SET key value in URL path
+  // PUT — write data using pipeline SET command
   if (req.method === 'PUT') {
     try {
-      const value = encodeURIComponent(JSON.stringify(req.body));
-      const r = await fetch(`${UPSTASH_URL}/set/${DATA_KEY}/${value}`, {
+      const value = JSON.stringify(req.body);
+      const r = await fetch(`${UPSTASH_URL}/pipeline`, {
         method: 'POST',
-        headers: authHeaders
+        headers: authHeaders,
+        body: JSON.stringify([['SET', DATA_KEY, value]])
       });
       await r.json();
       return res.status(200).json({ ok: true });
