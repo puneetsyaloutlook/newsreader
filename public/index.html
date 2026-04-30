@@ -128,29 +128,17 @@ body { font-family: var(--sans); font-size: 1rem; line-height: 1.6; color: var(-
 
 <div id="syncOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:100; align-items:center; justify-content:center;">
   <div style="background:#fff; border-radius:10px; padding:1.5rem; max-width:420px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.18);">
-    <div style="font-family:var(--serif); font-size:1.1rem; font-weight:700; margin-bottom:0.5rem;">Sync devices</div>
-    <p style="font-size:0.82rem; color:var(--muted); margin-bottom:1.25rem; line-height:1.55;">Copy the shareable link and open it on any other device to link automatically. Or use the sync code to link manually.</p>
+    <div style="font-family:var(--serif); font-size:1.1rem; font-weight:700; margin-bottom:0.5rem;">Sync</div>
+    <p style="font-size:0.82rem; color:var(--muted); margin-bottom:1.25rem; line-height:1.55;">All devices sync automatically. Open the app URL on any device and your topics and results will load within a few seconds.</p>
     <div style="margin-bottom:1rem;">
-      <label style="font-size:0.75rem; font-weight:600; color:var(--muted); display:block; margin-bottom:4px;">Shareable link</label>
+      <label style="font-size:0.75rem; font-weight:600; color:var(--muted); display:block; margin-bottom:4px;">App URL</label>
       <div style="display:flex; gap:8px;">
         <input type="text" id="syncLinkDisplay" readonly style="flex:1; font-family:monospace; font-size:0.75rem; padding:7px 10px; border:1px solid var(--border); border-radius:var(--r); background:var(--n100); color:var(--text);" />
         <button class="btn" onclick="copySyncLink()">Copy</button>
       </div>
-      <div style="font-size:0.72rem; color:var(--muted); margin-top:4px;">Opening this URL on another device links it automatically.</div>
-    </div>
-    <div style="margin-bottom:1rem;">
-      <label style="font-size:0.75rem; font-weight:600; color:var(--muted); display:block; margin-bottom:4px;">Sync code</label>
-      <div style="display:flex; gap:8px;">
-        <input type="text" id="syncCodeDisplay" readonly style="flex:1; font-family:monospace; font-size:0.8rem; padding:7px 10px; border:1px solid var(--border); border-radius:var(--r); background:var(--n100); color:var(--text);" />
-        <button class="btn" onclick="copySyncCode()">Copy</button>
-      </div>
     </div>
     <div style="margin-bottom:1.25rem;">
-      <label style="font-size:0.75rem; font-weight:600; color:var(--muted); display:block; margin-bottom:4px;">Link to another device</label>
-      <div style="display:flex; gap:8px;">
-        <input type="text" id="syncCodeInput" placeholder="Paste sync code here" style="flex:1; font-size:0.82rem; padding:7px 10px; border:1px solid var(--border); border-radius:var(--r); font-family:monospace;" />
-        <button class="btn btn-primary" onclick="applySyncCode()">Link</button>
-      </div>
+      <button class="btn btn-primary" onclick="applySyncCode()" style="width:100%;">Pull latest from remote</button>
       <div id="syncMsg" style="font-size:0.75rem; margin-top:6px; min-height:1rem;"></div>
     </div>
     <div style="text-align:right;">
@@ -198,7 +186,7 @@ function loadTopics() {
 function saveTopics(t) {
   try { localStorage.setItem(TOPICS_KEY, JSON.stringify(t)); } catch(e) {}
   if (_remoteCache !== null) _remoteCache._topics = t;
-  ensureBinExists().then(() => saveTopicsRemote(t));
+  saveRemoteCache();
 }
 
 function getUserId() {
@@ -209,20 +197,16 @@ function getUserId() {
   }
   return uid;
 }
-function getBinId() { return localStorage.getItem(BIN_ID_KEY) || null; }
-function setBinId(id) { localStorage.setItem(BIN_ID_KEY, id); }
 
 let _remoteCache = {};
 let _remoteCacheLoaded = false;
 
 async function loadRemoteCache() {
   if (_remoteCacheLoaded) return _remoteCache;
-  const binId = getBinId();
-  if (!binId) { _remoteCacheLoaded = true; return _remoteCache; }
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(`/api/cache?binId=${binId}`, { signal: controller.signal });
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const res = await fetch('/api/cache', { signal: controller.signal });
     clearTimeout(timeout);
     if (!res.ok) { _remoteCacheLoaded = true; return _remoteCache; }
     _remoteCache = await res.json() || {};
@@ -233,31 +217,13 @@ async function loadRemoteCache() {
 
 async function saveRemoteCache() {
   if (!_remoteCache) return;
-  const binId = getBinId();
   try {
-    if (binId) {
-      await fetch(`/api/cache?binId=${binId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: _remoteCache })
-      });
-    } else {
-      const res = await fetch('/api/cache', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: getUserId(), data: _remoteCache })
-      });
-      const result = await res.json();
-      if (result.metadata?.id) setBinId(result.metadata.id);
-    }
+    await fetch('/api/cache', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(_remoteCache)
+    });
   } catch(e) {}
-}
-
-async function ensureBinExists() {
-  if (getBinId()) return;
-  if (!_remoteCache) _remoteCache = {};
-  _remoteCache._topics = topics;
-  await saveRemoteCache();
 }
 
 async function loadResults(id) {
@@ -624,45 +590,32 @@ async function runSearch() {
 // ── Sync panel ───────────────────────────────────────────────────────────────
 
 async function openSyncPanel() {
-  document.getElementById('syncCodeDisplay').value = 'Saving...';
   document.getElementById('syncLinkDisplay').value = 'Saving...';
-  document.getElementById('syncCodeInput').value = '';
   document.getElementById('syncMsg').textContent = '';
   document.getElementById('syncOverlay').style.display = 'flex';
   try {
     _remoteCache._topics = topics;
     await saveRemoteCache();
   } catch(e) {}
-  const binId = getBinId() || 'not-yet-created';
-  document.getElementById('syncCodeDisplay').value = getUserId() + '|' + binId;
-  document.getElementById('syncLinkDisplay').value = window.location.origin + window.location.pathname + '?bin=' + binId;
+  document.getElementById('syncLinkDisplay').value = window.location.origin + window.location.pathname;
 }
 function closeSyncPanel() { document.getElementById('syncOverlay').style.display = 'none'; }
 function copySyncCode() {
-  navigator.clipboard.writeText(document.getElementById('syncCodeDisplay').value).then(() => {
+  navigator.clipboard.writeText(window.location.origin + window.location.pathname).then(() => {
     const msg = document.getElementById('syncMsg');
-    msg.style.color = '#1D6068'; msg.textContent = 'Copied to clipboard.';
+    msg.style.color = '#1D6068'; msg.textContent = 'Link copied to clipboard.';
   });
 }
 function copySyncLink() {
-  navigator.clipboard.writeText(document.getElementById('syncLinkDisplay').value).then(() => {
+  navigator.clipboard.writeText(window.location.origin + window.location.pathname).then(() => {
     const msg = document.getElementById('syncMsg');
     msg.style.color = '#1D6068'; msg.textContent = 'Link copied to clipboard.';
   });
 }
 async function applySyncCode() {
-  const raw = document.getElementById('syncCodeInput').value.trim();
   const msg = document.getElementById('syncMsg');
-  if (!raw) { msg.style.color = '#a02020'; msg.textContent = 'Paste a sync code first.'; return; }
-  const parts = raw.split('|');
-  if (parts.length !== 2 || !parts[0] || !parts[1]) { msg.style.color = '#a02020'; msg.textContent = 'Invalid sync code.'; return; }
-  const [uid, binId] = parts;
-  msg.style.color = '#8E8E9A'; msg.textContent = 'Verifying...';
+  msg.style.color = '#8E8E9A'; msg.textContent = 'Pulling latest data...';
   try {
-    const res = await fetch(`/api/cache?binId=${binId}`);
-    if (!res.ok) { msg.style.color = '#a02020'; msg.textContent = 'Could not verify that sync code.'; return; }
-    localStorage.setItem(USER_ID_KEY, uid);
-    localStorage.setItem(BIN_ID_KEY, binId);
     _remoteCache = {};
     _remoteCacheLoaded = false;
     await loadRemoteCache();
@@ -671,8 +624,13 @@ async function applySyncCode() {
       topics = remoteTopics;
       localStorage.setItem(TOPICS_KEY, JSON.stringify(topics));
       activeId = topics[0].id;
+      const local = loadLocalResults();
+      for (const t of topics) {
+        if (_remoteCache[t.id]) local[t.id] = _remoteCache[t.id];
+      }
+      saveLocalResults(local);
     }
-    msg.style.color = '#1D6068'; msg.textContent = 'Linked. Results will now sync with that device.';
+    msg.style.color = '#1D6068'; msg.textContent = 'Up to date.';
     setTimeout(() => { closeSyncPanel(); renderMain(); }, 1200);
   } catch(e) { msg.style.color = '#a02020'; msg.textContent = 'Something went wrong. Try again.'; }
 }
@@ -681,12 +639,6 @@ async function applySyncCode() {
 
 async function init() {
   getUserId();
-  const urlParams = new URLSearchParams(window.location.search);
-  const urlBin = urlParams.get('bin');
-  if (urlBin) {
-    setBinId(urlBin);
-    history.replaceState(null, '', window.location.pathname);
-  }
 
   // Render immediately from localStorage so the page is usable instantly
   renderNav();
@@ -694,24 +646,12 @@ async function init() {
 
   // Sync from remote in the background
   try {
-  // Always verify bin ID against registry to catch stale or wrong values
-  try {
-    const res = await fetch('/api/cache?registry=1');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.binId && data.binId !== getBinId()) {
-        setBinId(data.binId);
-        _remoteCacheLoaded = false;
-      }
-    }
-  } catch(e) {}
     await loadRemoteCache();
     const remoteTopics = await loadTopicsRemote();
     if (remoteTopics && remoteTopics.length) {
       topics = remoteTopics;
       localStorage.setItem(TOPICS_KEY, JSON.stringify(topics));
       activeId = activeId || topics[0].id;
-      // Sync remote results into localStorage
       const local = loadLocalResults();
       let updated = false;
       for (const t of topics) {
@@ -728,6 +668,7 @@ async function init() {
 }
 
 init();
+
 
 </script>
 </body>
