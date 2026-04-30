@@ -31,8 +31,8 @@ html, body { height: 100%; }
 body { font-family: var(--sans); font-size: 1rem; line-height: 1.6; color: var(--text); background: var(--n100); display: flex; min-height: 100vh; }
 
 .sidebar { width: 220px; min-width: 220px; background: var(--page); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 100vh; position: sticky; top: 0; height: 100vh; overflow-y: auto; transition: transform 0.2s; }
-.sidebar-inner { padding: 1.5rem 0 1rem; display: flex; flex-direction: column; height: 100%; }
-.sidebar-close { display: none; background: none; border: none; font-size: 1.1rem; color: var(--muted); cursor: pointer; padding: 0 1rem 0.5rem; text-align: right; line-height: 1; }
+.sidebar-inner { padding: 0 0 1rem; display: flex; flex-direction: column; height: 100%; }
+.sidebar-close { display: none; background: none; border: none; border-bottom: 1px solid var(--border); font-size: 0.78rem; font-weight: 600; color: var(--muted); cursor: pointer; padding: 12px 1rem; text-align: right; line-height: 1; font-family: var(--sans); letter-spacing: 0.02em; width: 100%; }
 .nav-group-label { font-size: 0.63rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--n300); padding: 1rem 1rem 0.3rem; }
 .nav-items { flex: 1; overflow-y: auto; }
 .nav-item { display: block; width: 100%; text-align: left; font-family: var(--sans); font-size: 0.82rem; font-weight: 500; line-height: 1.35; color: var(--muted); background: none; border: none; padding: 8px 1rem; cursor: pointer; transition: background 0.1s, color 0.1s; border-left: 3px solid transparent; }
@@ -111,7 +111,7 @@ body { font-family: var(--sans); font-size: 1rem; line-height: 1.6; color: var(-
 
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-inner">
-    <button class="sidebar-close" onclick="closeNav()" aria-label="Close navigation">&#8249;</button>
+    <button class="sidebar-close" onclick="closeNav()" aria-label="Close navigation">Close &#8249;</button>
     <div class="nav-items" id="navItems"></div>
     <div class="sidebar-footer">
       <button class="add-btn" onclick="startNewTopic()">+ Add topic</button>
