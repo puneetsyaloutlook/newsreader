@@ -673,7 +673,10 @@ async function init() {
       const res = await fetch('/api/cache?registry=1');
       if (res.ok) {
         const data = await res.json();
-        if (data.binId) setBinId(data.binId);
+        if (data.binId) {
+          setBinId(data.binId);
+          _remoteCacheLoaded = false;
+        }
       }
     } catch(e) {}
   }
