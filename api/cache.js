@@ -1,5 +1,6 @@
 const JBIN_BASE = 'https://api.jsonbin.io/v3/b';
 const KEY = process.env.JSONBIN_API_KEY;
+const REGISTRY_BIN_ID = process.env.REGISTRY_BIN_ID;
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -10,7 +11,17 @@ export default async function handler(req, res) {
 
   if (!KEY) return res.status(500).json({ error: 'JSONBIN_API_KEY not configured' });
 
-  const { binId } = req.query;
+  const { binId, registry } = req.query;
+
+  // GET /api/cache?registry=1 — return the user's data bin ID from environment
+  if (req.method === 'GET' && registry) {
+    if (!REGISTRY_BIN_ID) return res.status(404).json({ error: 'REGISTRY_BIN_ID not configured' });
+    const upstream = await fetch(`${JBIN_BASE}/${REGISTRY_BIN_ID}/latest?meta=false`, {
+      headers: { 'X-Master-Key': KEY }
+    });
+    const data = await upstream.json();
+    return res.status(upstream.status).json(data);
+  }
 
   // GET /api/cache?binId=xxx — read bin
   if (req.method === 'GET' && binId) {
