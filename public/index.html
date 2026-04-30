@@ -658,6 +658,15 @@ async function init() {
     setBinId(urlBin);
     history.replaceState(null, '', window.location.pathname);
   }
+  if (!getBinId()) {
+    try {
+      const res = await fetch('/api/cache?registry=1');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.binId) setBinId(data.binId);
+      }
+    } catch(e) {}
+  }
   try { await loadRemoteCache(); } catch(e) {}
   try {
     const remoteTopics = await loadTopicsRemote();
