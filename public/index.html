@@ -229,14 +229,8 @@ async function saveRemoteCache() {
 async function loadResults(id) {
   const local = loadLocalResults();
   if (local[id]) return local[id];
-  try {
-    const cache = await loadRemoteCache();
-    if (cache[id]) {
-      local[id] = cache[id];
-      saveLocalResults(local);
-    }
-    return cache[id] || null;
-  } catch(e) { return null; }
+  if (_remoteCache[id]) return _remoteCache[id];
+  return null;
 }
 
 async function saveResults(id, data) {
