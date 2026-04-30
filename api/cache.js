@@ -28,15 +28,13 @@ export default async function handler(req, res) {
     }
   }
 
-  // PUT — write data
+  // PUT — write data using SET key value in URL path
   if (req.method === 'PUT') {
     try {
-      const value = JSON.stringify(req.body);
-      // Upstash REST: POST /set/KEY with raw string body
-      const r = await fetch(`${UPSTASH_URL}/set/${DATA_KEY}`, {
+      const value = encodeURIComponent(JSON.stringify(req.body));
+      const r = await fetch(`${UPSTASH_URL}/set/${DATA_KEY}/${value}`, {
         method: 'POST',
-        headers: { ...authHeaders, 'Content-Type': 'text/plain' },
-        body: value
+        headers: authHeaders
       });
       await r.json();
       return res.status(200).json({ ok: true });
