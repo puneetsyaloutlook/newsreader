@@ -694,16 +694,17 @@ async function init() {
 
   // Sync from remote in the background
   try {
-    if (!getBinId()) {
-      const res = await fetch('/api/cache?registry=1');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.binId) {
-          setBinId(data.binId);
-          _remoteCacheLoaded = false;
-        }
+  // Always verify bin ID against registry to catch stale or wrong values
+  try {
+    const res = await fetch('/api/cache?registry=1');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.binId && data.binId !== getBinId()) {
+        setBinId(data.binId);
+        _remoteCacheLoaded = false;
       }
     }
+  } catch(e) {}
     await loadRemoteCache();
     const remoteTopics = await loadTopicsRemote();
     if (remoteTopics && remoteTopics.length) {
