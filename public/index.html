@@ -447,6 +447,33 @@ async function callAPI(messages, useSearch, maxTokens = 1000) {
   return res.json();
 }
 
+// Run a full agentic search loop: keeps cycling through tool-use turns until
+// the model produces a text response (stop_reason === 'end_turn').
+async function runSearchLoop(userPrompt, maxTokens = 4000) {
+  const searchTools = [{ type: 'web_search_20260318', name: 'web_search' }];
+  let messages = [{ role: 'user', content: userPrompt }];
+  for (let i = 0; i < 8; i++) {
+    const body = { model: 'claude-sonnet-4-6', max_tokens: maxTokens, messages, tools: searchTools };
+    const res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (data.error) return { error: data.error };
+    // Append assistant turn
+    messages.push({ role: 'assistant', content: data.content });
+    if (data.stop_reason === 'end_turn') return { text: extractText(data), content: data.content };
+    // If stop_reason is 'tool_use', feed tool results back
+    if (data.stop_reason === 'tool_use') {
+      const toolResults = (data.content || [])
+        .filter(b => b.type === 'tool_use')
+        .map(b => ({ type: 'tool_result', tool_use_id: b.id, content: b.input ? JSON.stringify(b.input) : '' }));
+      if (!toolResults.length) break;
+      messages.push({ role: 'user', content: toolResults });
+    } else {
+      break;
+    }
+  }
+  return { text: null };
+}
+
 function extractText(data) {
   if (!data.content) return null;
   const b = data.content.find(b => b.type==='text');
@@ -546,14 +573,14 @@ async function runSearch() {
   btn.disabled = true; spinner.classList.add('active');
   statusText.textContent = 'Searching...'; results.innerHTML = '';
   try {
-    const turn1 = await callAPI([{ role: 'user', content: buildSearchPrompt(topic) }], true);
-    if (turn1.error) { spinner.classList.remove('active'); statusText.textContent = ''; results.innerHTML = `<div class="error-msg">API error: ${esc(turn1.error.message)}</div>`; btn.disabled = false; return; }
-    if (!extractText(turn1)) { spinner.classList.remove('active'); statusText.textContent = 'No response from search step.'; btn.disabled = false; return; }
+    const search = await runSearchLoop(buildSearchPrompt(topic), 4000);
+    if (search.error) { spinner.classList.remove('active'); statusText.textContent = ''; results.innerHTML = `<div class="error-msg">API error: ${esc(search.error.message)}</div>`; btn.disabled = false; return; }
+    if (!search.text) { spinner.classList.remove('active'); statusText.textContent = 'No response from search step.'; btn.disabled = false; return; }
 
     statusText.textContent = 'Scoring...';
     const turn2 = await callAPI([
       { role: 'user', content: buildSearchPrompt(topic) },
-      { role: 'assistant', content: sanitiseContent(turn1.content) },
+      { role: 'assistant', content: sanitiseContent(search.content) },
       { role: 'user', content: buildJsonPrompt(topic) }
     ], false, 1000);
     if (turn2.error) { spinner.classList.remove('active'); statusText.textContent = ''; results.innerHTML = `<div class="error-msg">API error: ${esc(turn2.error.message)}</div>`; btn.disabled = false; return; }
